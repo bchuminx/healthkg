@@ -9,7 +9,7 @@ import numpy as np
 from neo4j import GraphDatabase
 
 uri = "bolt://localhost:7687"
-driver = GraphDatabase.driver(uri, auth=("neo4j", "ben27981"))
+driver = GraphDatabase.driver(uri, auth=("neo4j", "joey0706"))
 
 nlp = spacy.load('en_core_web_lg')
 nlp.add_pipe('dbpedia_spotlight')
@@ -139,7 +139,7 @@ if query != '':
                         answer_header = str(results_df.columns[1]).title()
 
                         with col2:
-                            st.markdown(''.join(['''<p style='color:#FDFD96;
+                            st.markdown(''.join(['''<p style='color:#daa520;
                                         font-size:18px;
                                         text-align:left'>''',"",answer_header,"</style></p><"]),unsafe_allow_html=True)
                         for name, group in results_df.groupby('Source'):
@@ -191,7 +191,7 @@ if query != '':
                             data = json.dumps([r.data() for r in recommended_info])
                             results_df = pd.read_json(data)
                             if 'Info' in results_df.columns:
-                                st.markdown(''.join(['''<p style='color:#FDFD96;
+                                st.markdown(''.join(['''<p style='color:#daa520;
                                            font-size:15px;
                                            text-align:left'>''',"&nbsp;&nbsp;&nbsp;Recommended Info: ",item,"</style></p>"]),unsafe_allow_html=True)
 
