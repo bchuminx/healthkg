@@ -142,28 +142,19 @@ if query != '':
                                 if ent.text.title() in group['Class'].values:
                                     group = group.drop('Class', axis=1)
                                 elif len(np.unique(group['Class'].values))==1:
-                                    #for cases where class are all the same
-                                    #eg query: "high blood pressure management"
-                                    #further edit can be with reference to queries like "what cause diabetes"
                                     group = group.drop('Class', axis=1)
                                 if group['Notes'].isna().sum()==group.shape[0]:
-                                    #drop Notes column if all are NA
-                                    #eg query: "high blood pressure management", "diabetes medication" 
                                     group = group.drop('Notes', axis=1)
                             
                             if not group.empty:
                                 with col2:
                                     if 'Class' in group.columns:
-                                        #for cases where class value and answer value is the same
-                                        #eg query: "test for diabetes"
-                                        #drops the class: test, test: test row
                                         group = group.loc[group.iloc[:,0]!=group.iloc[:,1],:]
                                     if 'Source' in group.columns:
                                         group.Source = group.Source.fillna("-")
                                     if 'Notes' in group.columns:
                                         group["Notes"] = group["Notes"].fillna("-")
                                     if 'Riskfactor' in group.columns:
-                                        #changes from Riskfactor to Risk Factor
                                         group = group.rename({'Riskfactor':'Risk Factor'},axis=1)
                                     group = group.drop('Source', axis=1)
                                     #group = group.rename(columns=group.iloc[0]).drop(group.index[0])
