@@ -1,4 +1,0 @@
-[local-neo4j]
-uri = localhost:7687
-user = neo4j
-password = ben27981
