@@ -11,9 +11,8 @@ from neo4j import GraphDatabase
 
 config = configparser.ConfigParser()
 
-config.read('healthhub.prop')
+config.read('../../healthhub.prop')
 
-uri = "bolt://localhost:7687"
 driver = GraphDatabase.driver("bolt://"+config['local-neo4j']['uri'], auth=(config['local-neo4j']['user'], config['local-neo4j']['password']))
 
 
@@ -59,7 +58,6 @@ def get_answer(entity, type):
                     where n.type =~ '(?i)"""+type+"""' and r.name =~ '(?i)""" + entity + """' and not x.name =~ '(?i)""" + entity + """'
                     return distinct x.type as Class,  x.name as """+type+""", r.source as Source, r.text as Notes, r.name as Name
                     """
-            print(query)
         return session.run(query)
 
 def get_info(entity):
@@ -68,8 +66,9 @@ def get_info(entity):
             query = """
                     match (n:Info)-[r]-(x)
                     where r.name =~ '(?i)""" + entity + """'
-                    return distinct r.text as Info, r.source as Source, r.name as Name
+                    return distinct r.text as Info, r.source as Source, r.name as Name, r.type as Type
                     """
+            print(query)
         return session.run(query)
     
 st.title('Health Knowledge Hub')
@@ -235,7 +234,7 @@ if query != '':
                                 related_lst.append(item)
 
                                 for name, group in results_df.groupby('Source'):
-                                    group = group.drop(['Name', 'Source'], axis=1)
+                                    group = group.drop(['Name', 'Source','Type'], axis=1)
                                     related_info_lst.append([name, group])
                                 
                 if related_lst!=[]:
@@ -252,12 +251,23 @@ if query != '':
         if info is not None:
             data = json.dumps([r.data() for r in info])
             results_df = pd.read_json(data)
-        
+            
             if 'Info' in results_df.columns:
                 info_header = "See more info for " + results_df['Name'][0]
+                info_types=list(set(list(results_df['Type'])))
                 with st.expander(info_header):
-                    for index, row in results_df.iterrows():
-                        st.info(row["Info"])
-                        st.markdown(''.join(['''<i><p style='color:RoyalBlue;
-                                           font-size:15px;
-                                           text-align:right'>''',"Source: ",results_df['Source'][index],"</style></p></i>"]), unsafe_allow_html=True)
+                    if not np.isnan(np.array(info_types)).any():
+                        info_selection = st.radio("Select type of info to view more",info_types)
+                        info_df= results_df.loc[results_df['Type']==info_selection].reset_index(drop=True)
+                        for index, row in info_df.iterrows():
+                            st.info(row['Info'])
+                            st.markdown(''.join(['''<i><p style='color:RoyalBlue;
+                                               font-size:15px;
+                                               text-align:right'>''',"Source: ",info_df['Source'][index],"</style></p></i>"]), unsafe_allow_html=True)
+                    else:
+                        for index, row in results_df.iterrows():
+                            st.info(row['Info'])
+                            st.markdown(''.join(['''<i><p style='color:RoyalBlue;
+                                               font-size:15px;
+                                               text-align:right'>''',"Source: ",results_df['Source'][index],"</style></p></i>"]), unsafe_allow_html=True)
+        
