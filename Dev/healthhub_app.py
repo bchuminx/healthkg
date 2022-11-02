@@ -1,3 +1,4 @@
+import configparser
 import json
 import spacy
 import spacy_dbpedia_spotlight
@@ -8,16 +9,26 @@ import numpy as np
 
 from neo4j import GraphDatabase
 
-uri = "bolt://localhost:7687"
-driver = GraphDatabase.driver(uri, auth=("neo4j", "joey0706"))
+config = configparser.ConfigParser()
 
-nlp = spacy.load('en_core_web_lg')
-nlp.add_pipe('dbpedia_spotlight')
+config.read('healthhub.prop')
+
+uri = "bolt://localhost:7687"
+driver = GraphDatabase.driver("bolt://"+config['local-neo4j']['uri'], auth=(config['local-neo4j']['user'], config['local-neo4j']['password']))
+
 
 st.set_page_config(
     page_title="Health Knowledge Hub",
     layout='wide'
 )
+
+@st.experimental_singleton
+def load_models():
+    model = spacy.load('en_core_web_lg')
+    model.add_pipe('dbpedia_spotlight')
+    return model
+
+nlp = load_models()
 
 def get_similar(entity):
     if entity != '':
@@ -25,7 +36,7 @@ def get_similar(entity):
             query = """
                     match (n)-[:related_to]-(x)
                     where (n.type = 'Disease' or n.type = 'Condition') and n.name =~ '(?i)""" + entity + """' and n.text <> ""
-                    return distinct x.name as Most_Similar
+                    return distinct x.name as Most_Similar, n.name as Name
                     """
         return session.run(query)
 
@@ -35,7 +46,7 @@ def get_definition(entity):
             query = """
                     match (n)
                     where (n.type = 'Disease' or n.type = 'Condition') and n.name =~ '(?i)""" + entity + """' and n.text <> ""
-                    return distinct n.text as Definition, n.source as Source
+                    return distinct n.text as Definition, n.source as Source, n.name as Name
                     """
         return session.run(query)
 
@@ -46,9 +57,9 @@ def get_answer(entity, type):
             query = """
                     match (n)-[r]-(x)
                     where n.type =~ '(?i)"""+type+"""' and r.name =~ '(?i)""" + entity + """' and not x.name =~ '(?i)""" + entity + """'
-                    return distinct x.type as Class,  x.name as """+type+""", r.source as Source, r.text as Notes
+                    return distinct x.type as Class,  x.name as """+type+""", r.source as Source, r.text as Notes, r.name as Name
                     """
-            #print(query)
+            print(query)
         return session.run(query)
 
 def get_info(entity):
@@ -57,7 +68,7 @@ def get_info(entity):
             query = """
                     match (n:Info)-[r]-(x)
                     where r.name =~ '(?i)""" + entity + """'
-                    return distinct r.text as Info, r.source as Source
+                    return distinct r.text as Info, r.source as Source, r.name as Name
                     """
         return session.run(query)
     
@@ -133,15 +144,23 @@ if query != '':
                     results_df = pd.read_json(data)
 
                     if not results_df.empty:
+                        name_label = results_df['Name'][0]
+
                         if 'Riskfactor' in results_df.columns:
                             results_df = results_df.rename({'Riskfactor':'Risk Factor'},axis=1)
 
                         answer_header = str(results_df.columns[1]).title()
 
                         with col2:
-                            st.markdown(''.join(['''<p style='color:#daa520;
+                            if answer_header=="Risk Factor":
+                                st.markdown(''.join(['''<p style='color:#daa520;
                                         font-size:18px;
-                                        text-align:left'>''',"",answer_header,"</style></p><"]),unsafe_allow_html=True)
+                                        text-align:left'>''',"",""+answer_header+"(s)"+" for "+name_label,"</style></p><"]),unsafe_allow_html=True)
+                            else:
+                                st.markdown(''.join(['''<p style='color:#daa520;
+                                        font-size:18px;
+                                        text-align:left'>''',"",answer_header+" for "+name_label,"</style></p><"]),unsafe_allow_html=True)
+
                         for name, group in results_df.groupby('Source'):
                             with col2:
                                 st.markdown(''.join(['''<i><p style='color:RoyalBlue;
@@ -164,10 +183,27 @@ if query != '':
                                         group.Source = group.Source.fillna("-")
                                     if 'Notes' in group.columns:
                                         group["Notes"] = group["Notes"].fillna("-")
-                                    group = group.drop('Source', axis=1)
+                                    if 'Risk Factor' in group.columns:
+                                        header = "Risk Factor(s) for " + name_label
+                                    else:
+                                        group = group.rename({search_type.title():search_type.title()+" for " + name_label}, axis=1)
+                                    group = group.drop(['Name', 'Source'], axis=1)
                                     #group = group.rename(columns=group.iloc[0]).drop(group.index[0])
                                     st.table(group)
 
+        if definition is not None:
+            data = json.dumps([r.data() for r in definition])
+            results_df = pd.read_json(data)
+            if 'Definition' in results_df.columns:
+                definition_header = "See definition for " + results_df['Name'][0]
+                with col1:
+                    with st.expander(definition_header):
+                        st.warning(results_df['Definition'][0])
+                        st.markdown(''.join(['''<i><p style='color:RoyalBlue;
+                                           font-size:15px;
+                                           text-align:right'>''',"Source: ",results_df['Source'][0],"</style></p></i>"]),unsafe_allow_html=True)
+
+        
         if most_similar is not None:
             data = json.dumps([r.data() for r in most_similar])
             results_df = pd.read_json(data)
@@ -181,9 +217,12 @@ if query != '':
                 similar_item = ', '.join([str(x) for x in similar_lst])
 
                 if similar_item is not "":
-                    st.info("Related To: " + similar_item) 
+                    similar_item_header = "Related to " + results_df['Name'][0] + ": "
+                    st.info(similar_item_header + similar_item)
 
             with col1:
+                related_lst=[]
+                related_info_lst=[]
                 for index, row in results_df.iterrows():
                         item = row['Most_Similar']
                         recommended_info = get_info(item)
@@ -191,37 +230,34 @@ if query != '':
                             data = json.dumps([r.data() for r in recommended_info])
                             results_df = pd.read_json(data)
                             if 'Info' in results_df.columns:
-                                st.markdown(''.join(['''<p style='color:#daa520;
-                                           font-size:15px;
-                                           text-align:left'>''',"&nbsp;&nbsp;&nbsp;Recommended Info: ",item,"</style></p>"]),unsafe_allow_html=True)
+                                related_info_header = "Info for " + item
+                                results_df = results_df.rename({'Info':related_info_header}, axis=1)
+                                related_lst.append(item)
 
                                 for name, group in results_df.groupby('Source'):
-                                    with col1:
-                                        st.markdown(''.join(['''<i><p style='color:RoyalBlue;
-                                                    font-size:15px;
-                                                    text-align:right'>''',"Source: ",name,"</style></p></i>"]),unsafe_allow_html=True)
-                                        group = group.drop('Source', axis=1)
-                                        st.table(group)
+                                    group = group.drop(['Name', 'Source'], axis=1)
+                                    related_info_lst.append([name, group])
+                                
+                if related_lst!=[]:
+                    st.markdown(''.join(['''<p style='color:#daa520;
+                                           font-size:18px;
+                                           text-align:left'> Recommended Info </style></p>''']), unsafe_allow_html=True)
 
-        if definition is not None:
-            data = json.dumps([r.data() for r in definition])
-            results_df = pd.read_json(data)
-            if 'Definition' in results_df.columns:
-                with col1:
-                    with st.expander("See definition"):
-                        st.warning(results_df['Definition'][0])
-                        st.markdown(''.join(['''<i><p style='color:RoyalBlue;
-                                           font-size:15px;
-                                           text-align:right'>''',"Source: ",results_df['Source'][0],"</style></p></i>"]),unsafe_allow_html=True)
+                    selection=st.radio("Select disease/condition to see more info",related_lst)
+                    st.markdown(''.join(['''<i><p style='color:RoyalBlue;
+                                                  font-size:15px;
+                                                  text-align:right'>''',"Source: ", related_info_lst[related_lst.index(selection)][0],"</style></p></i>"]), unsafe_allow_html=True)
+                    st.table(related_info_lst[related_lst.index(selection)][1])
 
         if info is not None:
             data = json.dumps([r.data() for r in info])
             results_df = pd.read_json(data)
         
-            with st.expander("See more info"):
-                if 'Info' in results_df.columns:
+            if 'Info' in results_df.columns:
+                info_header = "See more info for " + results_df['Name'][0]
+                with st.expander(info_header):
                     for index, row in results_df.iterrows():
-                        st.info(row['Info'])
+                        st.info(row["Info"])
                         st.markdown(''.join(['''<i><p style='color:RoyalBlue;
                                            font-size:15px;
-                                           text-align:right'>''',"Source: ",results_df['Source'][index],"</style></p></i>"]),unsafe_allow_html=True)
+                                           text-align:right'>''',"Source: ",results_df['Source'][index],"</style></p></i>"]), unsafe_allow_html=True)
