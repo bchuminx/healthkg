@@ -56,21 +56,20 @@ def get_primary_answer(entity, type):
             query = """
                     match (n)-[r]-(x)
                     where n.type =~ '(?i)"""+type+"""' and r.name =~ '(?i)""" + entity + """' and not x.name =~ '(?i)""" + entity + """'
-                    return distinct x.name as """+type+""", r.source as Source, r.text as Notes, r.name as Name
+                    return distinct x.name as Answer, r.source as Source, r.text as Notes, r.name as Name
                     """
-            print(query)
         return session.run(query)
 
-# def get_secondary_answer(entity, subject, object):
-#     subject = subject.title()
-#     object = object.title()
-#     with driver.session() as session:
-#         query = """
-#                 match (x)-[r1]-(n)-[r2]-(y)
-#                 where n.type =~ '(?i)"""+subject+"""' and n.name =~ '(?i)""" + entity + """' and x.type =~ '(?i)"""+object+"""' and not y.type =~ '(?i)"""+object+"""'
-#                 return distinct x.name as Type, y.name as """+subject+"""
-#                 """
-#     return session.run(query)
+def get_secondary_answer(entity, subject, object):
+    subject = subject.title()
+    object = object.title()
+    with driver.session() as session:
+        query = """
+                match (x)-[r1]-(n)-[r2]-(y)
+                where n.type =~ '(?i)"""+subject+"""' and n.name =~ '(?i)""" + entity + """' and x.type =~ '(?i)"""+object+"""' and not y.type =~ '(?i)"""+object+"""'
+                return distinct x.name as Type, y.name as """+subject+"""
+                """
+    return session.run(query)
 
 
 def get_info(entity):
@@ -111,15 +110,15 @@ if query != '':
     doc = nlp(query)
     
     for token in doc:
-        print(token.text, token.lemma_, token.pos_, token.tag_, token.dep_, token.shape_, token.is_alpha, token.is_stop)
+        #print(token.text, token.lemma_, token.pos_, token.tag_, token.dep_, token.shape_, token.is_alpha, token.is_stop)
 
-        # if token.dep_ in ['nsubj'] and token.pos_ == 'NOUN':
-        #     if token.lemma_ in ['effect']:
-        #         subject = 'effect'
+        if token.dep_ in ['nsubj'] and token.pos_ == 'NOUN':
+            if token.lemma_ in ['effect']:
+                subject = 'effect'
         
-        # elif token.dep_ in ['dobj', 'pobj'] and token.pos_ == 'NOUN':
-        #     if token.lemma_ in ['vaccine']:
-        #         object = 'vaccination'
+        elif token.dep_ in ['dobj', 'pobj'] and token.pos_ == 'NOUN':
+            if token.lemma_ in ['vaccine']:
+                object = 'vaccination'
 
         if token.dep_ in ['nsubj', 'conj', 'ROOT', 'dobj', 'pobj'] and token.pos_ == 'NOUN':
             if token.lemma_ in ['effect']:
@@ -157,24 +156,25 @@ if query != '':
                 search_types.append(search_type)
 
     for ent in doc.ents:
-        #if ent.text[0].isupper():
         most_similar = get_similar(ent.text)
         definition = get_definition(ent.text)
         info = get_info(ent.text)
 
-        # secondary_answer = get_secondary_answer(ent.text, subject, object)
+        if subject != "" and object != "":
+            secondary_answer = get_secondary_answer(ent.text, subject, object)
 
-        # if secondary_answer is not None:
-        #     data = json.dumps([r.data() for r in secondary_answer])
-        #     results_df = pd.read_json(data)
+            if secondary_answer is not None:
+                data = json.dumps([r.data() for r in secondary_answer])
+                results_df = pd.read_json(data)
 
-        #     for name, group in results_df.groupby('Type'):
-        #         with col2:
-        #             st.markdown(''.join(['''<i><p style='color:RoyalBlue;
-        #                         font-size:15px;
-        #                         text-align:left'>''',"Type: ",name,"</style></p></i>"]),unsafe_allow_html=True)
-        #             group = group.drop('Type', axis=1)
-        #             st.table(group)
+                if 'Type' in results_df.columns:
+                    for name, group in results_df.groupby('Type'):
+                        with col2:
+                            st.markdown(''.join(['''<i><p style='color:RoyalBlue;
+                                        font-size:15px;
+                                        text-align:left'>''',"Type: ",name,"</style></p></i>"]),unsafe_allow_html=True)
+                            group = group.drop('Type', axis=1)
+                            st.table(group)
 
         if search_types:
             for search_type in search_types:
