@@ -67,7 +67,7 @@ def get_secondary_answer(entity, subject, object):
         query = """
                 match (x)-[r1]-(n)-[r2]-(y)
                 where n.type =~ '(?i)"""+subject+"""' and n.name =~ '(?i)""" + entity + """' and x.type =~ '(?i)"""+object+"""' and not y.type =~ '(?i)"""+object+"""'
-                return distinct x.name as Type, y.name as """+subject+"""
+                return distinct r2.name as Type, y.name as """+subject+"""
                 """
     return session.run(query)
 
@@ -170,9 +170,9 @@ if query != '':
                 if 'Type' in results_df.columns:
                     for name, group in results_df.groupby('Type'):
                         with col2:
-                            st.markdown(''.join(['''<i><p style='color:RoyalBlue;
-                                        font-size:15px;
-                                        text-align:left'>''',"Type: ",name,"</style></p></i>"]),unsafe_allow_html=True)
+                            st.markdown(''.join(['''<p style='color:#daa520;
+                                        font-size:18px;
+                                        text-align:left'>''',"",""+name,"</style></p><"]),unsafe_allow_html=True)
                             group = group.drop('Type', axis=1)
                             st.table(group)
 
