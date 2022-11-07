@@ -23,7 +23,8 @@ st.set_page_config(
 
 @st.experimental_singleton
 def load_models():
-    model = spacy.load('en_core_web_lg')
+    #model = spacy.load('en_core_web_lg')
+    model = spacy.load("en_core_sci_lg")
     model.add_pipe('dbpedia_spotlight')
     return model
 
@@ -125,7 +126,7 @@ if query != '':
         if token.dep_ in ['nsubj', 'conj', 'ROOT', 'dobj', 'pobj'] and token.pos_ == 'NOUN':
             if token.lemma_ in ['effect']:
                 search_type = 'effect'
-            elif token.lemma_ in ['medication', 'medicine', 'treatment']:
+            elif token.lemma_ in ['cure', 'medication', 'medicine', 'treatment']:
                 search_type = 'prescription'
             elif token.lemma_ == 'management':
                 search_type = 'management'
