@@ -44,7 +44,7 @@ def get_definition(entity):
         with driver.session() as session:
             query = """
                     match (n)
-                    where (n.type = 'Disease' or n.type = 'Condition' or n.type = 'Vaccination') and n.name =~ '(?i)""" + entity + """' and n.text <> ""
+                    where (n.type = 'Disease' or n.type = 'Condition' or n.type = 'Vaccination' or n.type = 'Medication') and n.name =~ '(?i)""" + entity + """' and n.text <> ""
                     return distinct n.text as Definition, n.source as Source, n.name as Name
                     """
         return session.run(query)
@@ -56,7 +56,7 @@ def get_primary_answer(entity, type):
             query = """
                     match (n)-[r]-(x)
                     where n.type =~ '(?i)"""+type+"""' and r.name =~ '(?i)""" + entity + """' and not x.name =~ '(?i)""" + entity + """'
-                    return distinct x.name as Answer, r.source as Source, r.text as Notes, r.name as Name
+                    return distinct x.name as """+type+""", r.source as Source, r.text as Notes, r.name as Name
                     """
         return session.run(query)
 
@@ -119,6 +119,8 @@ if query != '':
         elif token.dep_ in ['dobj', 'pobj'] and token.pos_ == 'NOUN':
             if token.lemma_ in ['vaccine']:
                 object = 'vaccination'
+            elif token.lemma_ in ['medicine', 'medication']:
+                object = 'medication'
 
         if token.dep_ in ['nsubj', 'conj', 'ROOT', 'dobj', 'pobj'] and token.pos_ == 'NOUN':
             if token.lemma_ in ['effect']:
@@ -194,7 +196,7 @@ if query != '':
                             results_df = results_df.rename({'Effect':'Side Effect'},axis=1)
                             results_df = results_df[~results_df['Side Effect'].str.contains("COVID-19")]
 
-                        answer_header = str(results_df.columns[1]).title()
+                        answer_header = str(results_df.columns[0]).title()
 
                         with col2:
                             if answer_header=="Risk Factor":
