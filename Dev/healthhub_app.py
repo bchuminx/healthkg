@@ -23,7 +23,6 @@ st.set_page_config(
 
 @st.experimental_singleton
 def load_models():
-    #model = spacy.load('en_core_web_lg')
     model = spacy.load("en_core_sci_lg")
     model.add_pipe('dbpedia_spotlight')
     return model
@@ -117,13 +116,13 @@ if query != '':
             if token.lemma_ in ['effect']:
                 subject = 'effect'
         
-        elif token.dep_ in ['dobj', 'pobj'] and token.pos_ == 'NOUN':
+        elif token.dep_ in ['dobj', 'pobj', 'nmod'] and token.pos_ == 'NOUN':
             if token.lemma_ in ['vaccine']:
                 object = 'vaccination'
             elif token.lemma_ in ['medicine', 'medication']:
                 object = 'medication'
 
-        if token.dep_ in ['nsubj', 'conj', 'ROOT', 'dobj', 'pobj'] and token.pos_ == 'NOUN':
+        if token.dep_ in ['nsubj', 'nmod', 'conj', 'ROOT', 'dobj', 'pobj'] and token.pos_ == 'NOUN':
             if token.lemma_ in ['effect']:
                 search_type = 'effect'
             elif token.lemma_ in ['cure', 'medication', 'medicine', 'treatment']:
@@ -134,7 +133,7 @@ if query != '':
                 search_type = 'checkup'
             elif token.lemma_ in ['risk']:
                 search_type = 'riskfactor'
-            elif token.lemma_ in ['bill', 'payment', 'subsidy']:
+            elif token.lemma_ in ['bill', 'expense', 'payment', 'subsidy']:
                 search_type = 'expenses'
             elif token.lemma_ in ['vaccine']:
                 search_type = 'vaccination'
