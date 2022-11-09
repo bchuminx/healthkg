@@ -9,8 +9,12 @@ Poetry is a tool for dependency management and packaging in Python. Poetry offer
 
 ## Setup
 
-Go to the subfolder that contains the toml file and run ```poetry install``` in your terminal, this will setup and install all the required dependencies and libraries.
+Go to the folder that contains the toml file and run ```poetry install``` in your terminal, this will setup and install all the required dependencies and libraries.
 
-## Running the Application
+## Running Application
 
 Go to the subfolder that contains the py file and run ```poetry run streamlit run healthhub_app.py``` in your terminal to launch the streamlit app.
+
+## Building Package
+
+Go to the folder that contains the toml file and run ```poetry build```
