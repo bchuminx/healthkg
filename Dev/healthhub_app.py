@@ -1,8 +1,6 @@
 import configparser
 import json
 import spacy
-import spacy_dbpedia_spotlight
-import spacy_streamlit
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -24,7 +22,6 @@ st.set_page_config(
 @st.experimental_singleton
 def load_models():
     model = spacy.load("en_core_sci_lg")
-    model.add_pipe('dbpedia_spotlight')
     return model
 
 nlp = load_models()
