@@ -1,6 +1,9 @@
-# Health Knowledge Graph
+# Health Knowledge Graph (KG)
 
-Poetry is a tool for dependency management and packaging in Python. Poetry offers a lockfile to ensure repeatable installs, and can build the project for distribution. Poetry requires Python 3.7+ and it is multi-platform to work equally well on Linux, macOS and Windows.
+A Health KG is a collection of interlinked descriptions of health-related entities and relationships. It is created to semantically link knowledge together multiple credible sources, to normalize for fact finding, eliminating mislabels, typos, discrepancies and information ambiguity. From Health KG, Q&A systems can be powered by dense knowledge graph can turn questions into explorations of knowledge.
+
+![image](https://user-images.githubusercontent.com/7111764/200758357-813d9c68-5061-4271-9cd5-cd0e5f625167.png)
+
 
 ## Dependencies
 
