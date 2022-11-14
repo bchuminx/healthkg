@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "healthkg"
-version = "0.1.0"
+version = "1.1.0"
 description = "Health Knowledge Graph"
 authors = ["Benjamin Chu <bensabenteuer@gmail.com>"]
 readme = "README.md"
