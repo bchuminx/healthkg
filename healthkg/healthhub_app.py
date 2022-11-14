@@ -113,6 +113,14 @@ if query != '':
     for token in doc:
         #print(token.text, token.lemma_, token.pos_, token.tag_, token.dep_, token.shape_, token.is_alpha, token.is_stop)
 
+        if token.dep_ in ['compound'] and token.pos_ == 'NOUN':
+            compound_dict['compound'] = token.lemma_
+            compound_dict['compound_idx'] = token.i
+            compound = token.lemma_
+        if token.dep_ in ['amod'] and token.pos_ == 'ADJ':
+            compound_dict['modifier'] = token.lemma_
+            compound_dict['modifier_idx'] = token.i
+
         if token.dep_ in ['nsubj'] and token.pos_ == 'NOUN':
             if token.lemma_ in ['effect']:
                 subject = 'effect'
@@ -162,12 +170,29 @@ if query != '':
                 search_types.append(search_type)
 
     for ent in doc.ents:
-        most_similar = get_similar(ent.text)
-        definition = get_definition(ent.text)
-        info = get_info(ent.text)
+        words = str(ent.text).split()
+
+        if 'modifier_idx' in compound_dict.keys():
+            diff_idx = compound_dict['compound_idx'] - compound_dict['modifier_idx']
+            if diff_idx == 1:
+                compound = compound_dict['modifier'] + " " + compound_dict['compound']
+
+        if len(words) > 1:
+            most_similar = get_similar(compound)
+            definition = get_definition(compound)
+            info = get_info(compound)
+        else:
+            most_similar = get_similar(ent.text)
+            definition = get_definition(ent.text)
+            info = get_info(ent.text)
 
         if subject != "" and object != "":
-            secondary_answer = get_secondary_answer(ent.text, subject, object)
+            if len(words) > 1:
+                secondary_answer = get_secondary_answer(compound, subject, object)
+            else:
+                secondary_answer = get_secondary_answer(ent.text, subject, object)
+            
+            ans_dict={}
 
             if secondary_answer is not None:
                 data = json.dumps([r.data() for r in secondary_answer])
@@ -350,7 +375,7 @@ if query != '':
                 for index, row in results_df.iterrows():
                     item = row['Most_Similar']
                     recommended_info = get_info(item)
-                        results_df = pd.read_json(data)
+                    results_df = pd.read_json(data)
                     recommended_def = get_definition(item)
                     if recommended_info is not None:
                         data = json.dumps([r.data() for r in recommended_info])
@@ -376,8 +401,7 @@ if query != '':
                 if related_lst2!=[]:
                     st.markdown(''.join(['''<p style='color:#daa520;
                                         font-size:18px;
-
-                                        text-align:left'> Recommended Definition </style></p>''']), unsafe_allow_html=True)
+                                        text-align:left'>Definition </style></p>''']), unsafe_allow_html=True)
                     selection=st.radio("Select disease/condition to see more definitions",related_lst2)
                     st.markdown(''.join(['''<i><p style='color:RoyalBlue;
                                                 font-size:15px;
