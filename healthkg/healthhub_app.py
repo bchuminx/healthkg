@@ -112,7 +112,6 @@ if query != '':
     
     for token in doc:
         #print(token.text, token.lemma_, token.pos_, token.tag_, token.dep_, token.shape_, token.is_alpha, token.is_stop)
-
         if token.dep_ in ['compound'] and token.pos_ == 'NOUN':
             compound_dict['compound'] = token.lemma_
             compound_dict['compound_idx'] = token.i
@@ -120,7 +119,6 @@ if query != '':
         if token.dep_ in ['amod'] and token.pos_ == 'ADJ':
             compound_dict['modifier'] = token.lemma_
             compound_dict['modifier_idx'] = token.i
-
         if token.dep_ in ['nsubj'] and token.pos_ == 'NOUN':
             if token.lemma_ in ['effect']:
                 subject = 'effect'
@@ -168,176 +166,178 @@ if query != '':
                 search_type=token.lemma_
             if search_type != "":
                 search_types.append(search_type)
-
+                
+    prev_compound=""
     for ent in doc.ents:
         words = str(ent.text).split()
-
-        if 'modifier_idx' in compound_dict.keys():
+        if 'modifier_idx' in compound_dict.keys() and 'compound_idx' in compound_dict.keys():
             diff_idx = compound_dict['compound_idx'] - compound_dict['modifier_idx']
             if diff_idx == 1:
                 compound = compound_dict['modifier'] + " " + compound_dict['compound']
-
-        if len(words) > 1:
-            most_similar = get_similar(compound)
-            definition = get_definition(compound)
-            info = get_info(compound)
-        else:
-            most_similar = get_similar(ent.text)
-            definition = get_definition(ent.text)
-            info = get_info(ent.text)
-
-        if subject != "" and object != "":
+        while prev_compound!=compound:
             if len(words) > 1:
-                secondary_answer = get_secondary_answer(compound, subject, object)
+                most_similar = get_similar(compound)
+                definition = get_definition(compound)
+                info = get_info(compound)
             else:
-                secondary_answer = get_secondary_answer(ent.text, subject, object)
-            
-            ans_dict={}
-
-            if secondary_answer is not None:
-                data = json.dumps([r.data() for r in secondary_answer])
-                results_df = pd.read_json(data)
-                if 'Type' in results_df.columns:
-                    for name, group in results_df.groupby('Type'):
-                        if get_similar(name) is not None:
-                            med_class_data = json.dumps([r.data() for r in get_similar(name)])
-                            med_class_df = pd.read_json(med_class_data)
-                            if 'Most_Similar' in med_class_df.columns:
-                                for index,row in med_class_df.iterrows():
-                                    grp_item = row['Most_Similar']
-                                    if grp_item not in ans_dict:
-                                        ans_dict[grp_item]=[[name,group]]
-                                    else:
-                                        ans_dict[grp_item].append([name,group])
-                            else:
-                                ans_dict[name]=[[name,group]]
-                                                
-                with col2:
-                    if ans_dict!={}:
-                        answer_selection=st.radio("Select an option/group to view its corresponding answers", ans_dict.keys())
-                        if len(ans_dict[answer_selection])==1:
-                            for i in ans_dict[answer_selection]:
-                                st.markdown(''.join(['''<p style='color:#daa520;
-                                                        font-size:18px;
-                                                        text-align:left'>''',"",""+i[0],"</style></p><"]),unsafe_allow_html=True)
-                                if 'Type' in i[1].columns:
-                                    i[1]=i[1].drop('Type',axis=1)
-                                if 'Source' in i[1].columns:
-                                    for source_name,med_ans in i[1].groupby('Source'):
-                                        st.markdown(''.join(['''<i><p style='color:RoyalBlue;
-                                                            font-size:15px;
-                                                            text-align:right'>''',"Source: ",source_name,"</style></p></i>"]),unsafe_allow_html=True)
-                                        if not med_ans.empty:
-                                            med_ans=med_ans.drop('Source',axis=1)
-                                            if 'Effect' in med_ans.columns:
-                                                med_ans = med_ans.rename({'Effect':'Side Effect'},axis=1)
-                                                med_ans = med_ans[~med_ans['Side Effect'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
-                                            elif 'Instruction' in med_ans.columns:
-                                                med_ans = med_ans[~med_ans['Instruction'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
-                                            elif 'Precaution' in med_ans.columns:
-                                                med_ans = med_ans[~med_ans['Precaution'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]                                            
-                                            if med_ans['Notes'].isna().sum()==med_ans.shape[0]:
-                                                med_ans = med_ans.drop('Notes', axis=1)
-                                            if 'Notes' in med_ans.columns:
-                                                med_ans['Notes'] = med_ans['Notes'].fillna("-")
-                                            st.table(med_ans)
-                        else:
-                            list_of_options=[]
-                            specific_options=[]
-                            col2.caption("Select an option belonging to this group to view its corresponding answers. You may select more than one to compare.")
-                            for i in ans_dict[answer_selection]:
-                                list_of_options.append(i[0])
-                                specific_med_selection = col2.checkbox(i[0])
-                                if specific_med_selection:
-                                    specific_options.append(i[0])
-                            for i in specific_options:
-                                st.markdown(''.join(['''<p style='color:#daa520;
-                                                            font-size:18px;
-                                                            text-align:left'>''',"",""+i,"</style></p><"]),unsafe_allow_html=True)
-                                ans=ans_dict[answer_selection][list_of_options.index(i)][1]
-                                if 'Type' in ans.columns:
-                                    ans=ans.drop('Type',axis=1)
-                                if 'Source' in ans.columns:
-                                    for source_name,med_ans in ans.groupby('Source'):
-                                        st.markdown(''.join(['''<i><p style='color:RoyalBlue;
-                                                            font-size:15px;
-                                                            text-align:right'>''',"Source: ",source_name,"</style></p></i>"]),unsafe_allow_html=True)
-                                        if not med_ans.empty:
-                                            med_ans=med_ans.drop('Source',axis=1)
-                                            if 'Effect' in med_ans.columns:
-                                                med_ans = med_ans.rename({'Effect':'Side Effect'},axis=1)
-                                                med_ans = med_ans[~med_ans['Side Effect'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
-                                            elif 'Instruction' in med_ans.columns:
-                                                med_ans = med_ans[~med_ans['Instruction'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
-                                            elif 'Precaution' in med_ans.columns:
-                                                med_ans = med_ans[~med_ans['Precaution'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
-                                            if med_ans['Notes'].isna().sum()==med_ans.shape[0]:
-                                                med_ans = med_ans.drop('Notes', axis=1)
-                                            if 'Notes' in med_ans.columns:
-                                                med_ans['Notes'] = med_ans['Notes'].fillna("-")
-                                            st.table(med_ans)                                   
-
-                            
-
-
-        if search_types:
-            for search_type in search_types:
-                #print("Search Type:",search_type)
-                words = str(ent.text).split()
-                if len(words) > 1 and compound != '':
-                    primary_answer = get_primary_answer(compound, search_type)
+                most_similar = get_similar(ent.text)
+                definition = get_definition(ent.text)
+                info = get_info(ent.text)
+            if subject != "" and object != "":
+                if len(words) > 1:
+                    secondary_answer = get_secondary_answer(compound, subject, object)
                 else:
-                    primary_answer = get_primary_answer(ent.text, search_type)
-
-                if primary_answer is not None:
-                    data = json.dumps([r.data() for r in primary_answer])
+                    secondary_answer = get_secondary_answer(ent.text, subject, object)
+                ans_dict={}
+                if secondary_answer is not None:
+                    
+                    data = json.dumps([r.data() for r in secondary_answer])
                     results_df = pd.read_json(data)
-                    if not results_df.empty:
-                        name_label = results_df['Name'][0]
-
-                        if 'Riskfactor' in results_df.columns:
-                            results_df = results_df.rename({'Riskfactor':'Risk Factor'},axis=1)
-                        elif 'Effect' in results_df.columns:
-                            results_df = results_df.rename({'Effect':'Side Effect'},axis=1)
-                            results_df = results_df[~results_df['Side Effect'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
-                        elif 'Instruction' in results_df.columns:
-                            results_df = results_df[~results_df['Instruction'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
-                        elif 'Precaution' in results_df.columns:
-                            results_df = results_df[~results_df['Precaution'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
-                        answer_header = str(results_df.columns[0]).title()
-
-                        with col2:
-                            if answer_header=="Risk Factor":
-                                st.markdown(''.join(['''<p style='color:#daa520;
-                                        font-size:18px;
-                                        text-align:left'>''',"",""+answer_header+"(s)"+" for "+name_label,"</style></p><"]),unsafe_allow_html=True)
-                            else:
-                                st.markdown(''.join(['''<p style='color:#daa520;
-                                        font-size:18px;
-                                        text-align:left'>''',"",answer_header+" for "+name_label,"</style></p><"]),unsafe_allow_html=True)
-
-                        for name, group in results_df.groupby('Source'):
-                            with col2:
-                                st.markdown(''.join(['''<i><p style='color:RoyalBlue;
-                                            font-size:15px;
-                                            text-align:right'>''',"Source: ",name,"</style></p></i>"]),unsafe_allow_html=True)
-
-                            if group['Notes'].isna().sum()==group.shape[0]:
-                                    group = group.drop('Notes', axis=1)
-                            
-                            if not group.empty:
-                                with col2:
-                                    if 'Source' in group.columns:
-                                        group.Source = group.Source.fillna("-")
-                                    if 'Notes' in group.columns:
-                                        group["Notes"] = group["Notes"].fillna("-")
-                                    if 'Risk Factor' in group.columns:
-                                        header = "Risk Factor(s) for " + name_label
+                        
+                    if 'Type' in results_df.columns:
+                        
+                        for name, group in results_df.groupby('Type'):
+                            if get_similar(name) is not None:
+                                med_class_data = json.dumps([r.data() for r in get_similar(name)])
+                                med_class_df = pd.read_json(med_class_data)
+                                if 'Most_Similar' in med_class_df.columns:
+                                    for index,row in med_class_df.iterrows():
+                                        grp_item = row['Most_Similar']
+                                        if grp_item not in ans_dict:
+                                            ans_dict[grp_item]=[[name,group]]
+                                        else:
+                                            ans_dict[grp_item].append([name,group])
+                                else:
+                                    if name not in ans_dict:
+                                        ans_dict[name]=[[name,group]]
                                     else:
-                                        group = group.rename({search_type.title():search_type.title()+" for " + name_label}, axis=1)
-                                    group = group.drop(['Name', 'Source'], axis=1)
-                                    #group = group.rename(columns=group.iloc[0]).drop(group.index[0])
-                                    st.table(group)
+                                        ans_dict[name].append([name,group])
+                    with col2:
+                        if ans_dict!={}:
+                            answer_selection=st.radio("Select an option/group to view its corresponding answers", ans_dict.keys())
+                            if len(ans_dict[answer_selection])==1:
+                                for i in ans_dict[answer_selection]:
+                                    if 'Type' in i[1].columns:
+                                        i[1]=i[1].drop('Type',axis=1)
+                                    if 'Source' in i[1].columns:
+                                        for source_name,med_ans in i[1].groupby('Source'):
+                                            st.markdown(''.join(['''<p style='color:#daa520;
+                                                                    font-size:18px;
+                                                                    text-align:left'>''',"",""+i[0],"</style></p>",
+                                                                 '''<i><p style='color:RoyalBlue;font-size:15px;text-align:right'>''',"Source: ",""+source_name,"</style></p></i>"]),unsafe_allow_html=True)
+                                    
+                                            if not med_ans.empty:
+                                                med_ans=med_ans.drop('Source',axis=1)
+                                                if 'Effect' in med_ans.columns:
+                                                    med_ans = med_ans.rename({'Effect':'Side Effect'},axis=1)
+                                                    med_ans = med_ans[~med_ans['Side Effect'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
+                                                elif 'Instruction' in med_ans.columns:
+                                                    med_ans = med_ans[~med_ans['Instruction'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
+                                                elif 'Precaution' in med_ans.columns:
+                                                    med_ans = med_ans[~med_ans['Precaution'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]                                            
+                                                if med_ans['Notes'].isna().sum()==med_ans.shape[0]:
+                                                    med_ans = med_ans.drop('Notes', axis=1)
+                                                if 'Notes' in med_ans.columns:
+                                                    med_ans['Notes'] = med_ans['Notes'].fillna("-")
+                                                st.table(med_ans)
+                            else:
+                                list_of_options=[]
+                                specific_options=[]
+                                col2.caption("Select an option belonging to this group to view its corresponding answers. You may select more than one to compare.")
+                                for i in ans_dict[answer_selection]:
+                                    list_of_options.append(i[0])
+                                    specific_med_selection = col2.checkbox(i[0])
+                                    if specific_med_selection:
+                                        specific_options.append(i[0])
+                                for i in specific_options:
+                                    ans=ans_dict[answer_selection][list_of_options.index(i)][1]
+                                    if 'Type' in ans.columns:
+                                        ans=ans.drop('Type',axis=1)
+                                    if 'Source' in ans.columns:
+                                        for source_name,med_ans in ans.groupby('Source'):
+                                            st.markdown(''.join(['''<p style='color:#daa520;
+                                                                font-size:18px;
+                                                                text-align:left'>''',"",""+i,"</style></p>",
+                                                                '''<i><p style='color:RoyalBlue;
+                                                                font-size:15px;
+                                                                text-align:right'>''',"Source: ",source_name,"</style></p></i>"]),unsafe_allow_html=True)
+
+                                            if not med_ans.empty:
+                                                med_ans=med_ans.drop('Source',axis=1)
+                                                if 'Effect' in med_ans.columns:
+                                                    med_ans = med_ans.rename({'Effect':'Side Effect'},axis=1)
+                                                    med_ans = med_ans[~med_ans['Side Effect'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
+                                                elif 'Instruction' in med_ans.columns:
+                                                    med_ans = med_ans[~med_ans['Instruction'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
+                                                elif 'Precaution' in med_ans.columns:
+                                                    med_ans = med_ans[~med_ans['Precaution'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
+                                                if med_ans['Notes'].isna().sum()==med_ans.shape[0]:
+                                                    med_ans = med_ans.drop('Notes', axis=1)
+                                                if 'Notes' in med_ans.columns:
+                                                    med_ans['Notes'] = med_ans['Notes'].fillna("-")
+                                                st.table(med_ans)
+                            st.markdown("""---""")
+                                            
+            
+            if search_types:
+                for search_type in search_types:
+                    #print("Search Type:",search_type)
+                    words = str(ent.text).split()
+                    if len(words) > 1 and compound != '':
+                        primary_answer = get_primary_answer(compound, search_type)
+                    else:
+                        primary_answer = get_primary_answer(ent.text, search_type)
+
+                    if primary_answer is not None:
+                        data = json.dumps([r.data() for r in primary_answer])
+                        results_df = pd.read_json(data)
+                        if not results_df.empty:
+                            name_label = results_df['Name'][0]
+
+                            if 'Riskfactor' in results_df.columns:
+                                results_df = results_df.rename({'Riskfactor':'Risk Factor'},axis=1)
+                            elif 'Effect' in results_df.columns:
+                                results_df = results_df.rename({'Effect':'Side Effect'},axis=1)
+                                results_df = results_df[~results_df['Side Effect'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
+                            elif 'Instruction' in results_df.columns:
+                                results_df = results_df[~results_df['Instruction'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
+                            elif 'Precaution' in results_df.columns:
+                                results_df = results_df[~results_df['Precaution'].str.contains("COVID-19|Diabetes|High Blood Pressure|High Cholesterol|Stroke|Colorectal Cancer")]
+                            answer_header = str(results_df.columns[0]).title()
+
+                            with col2:
+                                for name, group in results_df.groupby('Source'):
+                                    if answer_header=="Risk Factor":
+                                        st.markdown(''.join(['''<p style='color:#daa520;
+                                                font-size:18px;
+                                                text-align:left'>''',"",""+answer_header+"(s)"+" for "+name_label,"</style></p>",
+                                                '''<i><p style='color:RoyalBlue;
+                                                font-size:15px;
+                                                text-align:right'>''',"Source: ",name,"</style></p></i>"]),unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(''.join(['''<p style='color:#daa520;
+                                                font-size:18px;
+                                                text-align:left'>''',"",answer_header+" for "+name_label,"</style></p>",
+                                                '''<i><p style='color:RoyalBlue;
+                                                font-size:15px;
+                                                text-align:right'>''',"Source: ",name,"</style></p></i>"]),unsafe_allow_html=True)
+
+                                    if group['Notes'].isna().sum()==group.shape[0]:
+                                            group = group.drop('Notes', axis=1)
+                                    
+                                    if not group.empty:
+                                            if 'Source' in group.columns:
+                                                group.Source = group.Source.fillna("-")
+                                            if 'Notes' in group.columns:
+                                                group["Notes"] = group["Notes"].fillna("-")
+                                            if 'Risk Factor' in group.columns:
+                                                header = "Risk Factor(s) for " + name_label
+                                            else:
+                                                group = group.rename({search_type.title():search_type.title()+" for " + name_label}, axis=1)
+                                            group = group.drop(['Name', 'Source'], axis=1)
+                                            #group = group.rename(columns=group.iloc[0]).drop(group.index[0])
+                                            st.table(group)
+            prev_compound=compound
 
         if definition is not None:
             data = json.dumps([r.data() for r in definition])
@@ -367,6 +367,7 @@ if query != '':
                 if similar_item is not "":
                     similar_item_header = "Related to " + results_df['Name'][0] + ": "
                     st.info(similar_item_header + similar_item)
+                    
             with col1:
                 related_lst1=[] 
                 related_info_lst=[]
@@ -379,6 +380,7 @@ if query != '':
                     recommended_def = get_definition(item)
                     if recommended_info is not None:
                         data = json.dumps([r.data() for r in recommended_info])
+                        results_df = pd.read_json(data)
                         if 'Info' in results_df.columns:
                             related_info_header = "Info for " + item
                             results_df = results_df.rename({'Info':related_info_header}, axis=1)
@@ -399,25 +401,28 @@ if query != '':
                                 group = group.drop(['Name', 'Source'], axis=1)
                                 related_def_lst.append([name, group])
                 if related_lst2!=[]:
+                    st.markdown("""---""")
                     st.markdown(''.join(['''<p style='color:#daa520;
                                         font-size:18px;
                                         text-align:left'>Definition </style></p>''']), unsafe_allow_html=True)
-                    selection=st.radio("Select disease/condition to see more definitions",related_lst2)
+                    def_selection=st.radio("Select disease/condition to see more definitions",related_lst2)
                     st.markdown(''.join(['''<i><p style='color:RoyalBlue;
                                                 font-size:15px;
-                                                text-align:right'>''',"Source: ", related_def_lst[related_lst2.index(selection)][0],"</style></p></i>"]), unsafe_allow_html=True)
-                    st.table(related_def_lst[related_lst2.index(selection)][1])
+                                                text-align:right'>''',"Source: ", related_def_lst[related_lst2.index(def_selection)][0],"</style></p></i>"]), unsafe_allow_html=True)
+                    st.table(related_def_lst[related_lst2.index(def_selection)][1])
+                    
                     
                 if related_lst1!=[]:
+                    st.markdown("""---""")
                     st.markdown(''.join(['''<p style='color:#daa520;
                                         font-size:18px;
                                         text-align:left'> Recommended Info </style></p>''']), unsafe_allow_html=True)
 
-                    selection=st.radio("Select disease/condition to see more info",related_lst1)
+                    info_selection=st.radio("Select disease/condition to see more info",related_lst1)
                     st.markdown(''.join(['''<i><p style='color:RoyalBlue;
                                                 font-size:15px;
-                                                text-align:right'>''',"Source: ", related_info_lst[related_lst1.index(selection)][0],"</style></p></i>"]), unsafe_allow_html=True)
-                    st.table(related_info_lst[related_lst1.index(selection)][1])
+                                                text-align:right'>''',"Source: ", related_info_lst[related_lst1.index(info_selection)][0],"</style></p></i>"]), unsafe_allow_html=True)
+                    st.table(related_info_lst[related_lst1.index(info_selection)][1])
 
 
         if info is not None:
