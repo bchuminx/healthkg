@@ -111,16 +111,7 @@ if query != '':
     doc = nlp(query)
     
     for token in doc:
-        #print(token.i, token.text, token.lemma_, token.pos_, token.tag_, token.dep_, token.shape_, token.is_alpha, token.is_stop)
-
-        if token.dep_ in ['compound'] and token.pos_ == 'NOUN':
-            compound_dict['compound'] = token.lemma_
-            compound_dict['compound_idx'] = token.i
-            compound = token.lemma_
-        
-        if token.dep_ in ['amod'] and token.pos_ == 'ADJ':
-            compound_dict['modifier'] = token.lemma_
-            compound_dict['modifier_idx'] = token.i
+        #print(token.text, token.lemma_, token.pos_, token.tag_, token.dep_, token.shape_, token.is_alpha, token.is_stop)
 
         if token.dep_ in ['nsubj'] and token.pos_ == 'NOUN':
             if token.lemma_ in ['effect']:
@@ -134,7 +125,7 @@ if query != '':
                 object = 'vaccination'
             elif token.lemma_ in ['medicine', 'medication']:
                 object = 'medication'
-        
+
         if token.dep_ in ['nsubj', 'nmod', 'conj', 'ROOT', 'dobj', 'pobj'] and token.pos_ == 'NOUN':
             if token.lemma_ in ['effect']:
                 search_type = 'effect'
@@ -171,26 +162,13 @@ if query != '':
                 search_types.append(search_type)
 
     for ent in doc.ents:
-        words = str(ent.text).split()
+        most_similar = get_similar(ent.text)
+        definition = get_definition(ent.text)
+        info = get_info(ent.text)
 
-        if 'modifier' in compound_dict.keys():
-            if compound_dict['modifier_idx'] < compound_dict['compound_idx']:
-                compound = compound_dict['modifier'] + " " + compound_dict['compound'] 
-
-        if len(words) > 1 and compound != '':
-            most_similar = get_similar(compound)
-            definition = get_definition(compound)
-            info = get_info(compound)
-        else:
-            most_similar = get_similar(ent.text)
-            definition = get_definition(ent.text)
-            info = get_info(ent.text)
         if subject != "" and object != "":
-            if len(words) > 1 and compound != '':
-                secondary_answer = get_secondary_answer(compound, subject, object)
-            else:
-                secondary_answer = get_secondary_answer(ent.text, subject, object)
-            ans_dict={}
+            secondary_answer = get_secondary_answer(ent.text, subject, object)
+
             if secondary_answer is not None:
                 data = json.dumps([r.data() for r in secondary_answer])
                 results_df = pd.read_json(data)
@@ -365,19 +343,17 @@ if query != '':
                     similar_item_header = "Related to " + results_df['Name'][0] + ": "
                     st.info(similar_item_header + similar_item)
             with col1:
-                related_lst1 = [] 
-                related_info_lst = []
-                related_lst2 = [] 
-                related_def_lst = []
-
+                related_lst1=[] 
+                related_info_lst=[]
+                related_lst2=[] 
+                related_def_lst=[]
                 for index, row in results_df.iterrows():
                     item = row['Most_Similar']
                     recommended_info = get_info(item)
+                        results_df = pd.read_json(data)
                     recommended_def = get_definition(item)
-
                     if recommended_info is not None:
                         data = json.dumps([r.data() for r in recommended_info])
-                        results_df = pd.read_json(data)
                         if 'Info' in results_df.columns:
                             related_info_header = "Info for " + item
                             results_df = results_df.rename({'Info':related_info_header}, axis=1)
@@ -390,7 +366,6 @@ if query != '':
                     if recommended_def is not None:
                         data = json.dumps([r.data() for r in recommended_def])
                         results_df = pd.read_json(data)
-
                         if 'Definition' in results_df.columns:
                             related_def_header = "Definition for " + item
                             results_df = results_df.rename({'Definition':related_def_header}, axis=1)
@@ -398,19 +373,18 @@ if query != '':
                             for name, group in results_df.groupby('Source'):
                                 group = group.drop(['Name', 'Source'], axis=1)
                                 related_def_lst.append([name, group])
-                
-                if related_lst2 != []:
+                if related_lst2!=[]:
                     st.markdown(''.join(['''<p style='color:#daa520;
                                         font-size:18px;
-                                        text-align:left'> Definition </style></p>''']), unsafe_allow_html=True)
 
+                                        text-align:left'> Recommended Definition </style></p>''']), unsafe_allow_html=True)
                     selection=st.radio("Select disease/condition to see more definitions",related_lst2)
                     st.markdown(''.join(['''<i><p style='color:RoyalBlue;
                                                 font-size:15px;
                                                 text-align:right'>''',"Source: ", related_def_lst[related_lst2.index(selection)][0],"</style></p></i>"]), unsafe_allow_html=True)
                     st.table(related_def_lst[related_lst2.index(selection)][1])
                     
-                if related_lst1 != []:
+                if related_lst1!=[]:
                     st.markdown(''.join(['''<p style='color:#daa520;
                                         font-size:18px;
                                         text-align:left'> Recommended Info </style></p>''']), unsafe_allow_html=True)
@@ -420,6 +394,7 @@ if query != '':
                                                 font-size:15px;
                                                 text-align:right'>''',"Source: ", related_info_lst[related_lst1.index(selection)][0],"</style></p></i>"]), unsafe_allow_html=True)
                     st.table(related_info_lst[related_lst1.index(selection)][1])
+
 
         if info is not None:
             data = json.dumps([r.data() for r in info])
